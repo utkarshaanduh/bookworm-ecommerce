@@ -1,0 +1,242 @@
+openapi: 3.0.3
+info:
+  title: Book Worm E-Bookstore API
+  version: 1.0.0
+  description: Backend for the Book Worm e-bookstore (catalogue, cart, checkout, orders). Auth uses `Authorization: Bearer <token>` from /api/auth/login.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Catalogue
+  - name: Cart
+  - name: Orders
+  - name: Admin
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a customer (gets 100 welcome gift points)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RegisterRequest' } } } }
+      responses:
+        '201': { description: Registered, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '409': { description: Email already registered }
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Log in
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Invalid credentials }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      responses: { '204': { description: Logged out } }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      responses: { '200': { description: OK }, '401': { description: Login required } }
+  /api/home:
+    get:
+      tags: [Catalogue]
+      security: []
+      summary: Landing page - recommended (from order history), bestsellers, new launches, categories
+      responses: { '200': { description: OK } }
+  /api/categories:
+    get: { tags: [Catalogue], security: [], summary: List categories, responses: { '200': { description: OK } } }
+  /api/brands:
+    get: { tags: [Catalogue], security: [], summary: List brands (publishers), responses: { '200': { description: OK } } }
+  /api/books:
+    get:
+      tags: [Catalogue]
+      security: []
+      summary: Search and filter books
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: brand, in: query, schema: { type: string } }
+        - { name: language, in: query, schema: { type: string } }
+        - { name: format, in: query, schema: { type: string, enum: [Paperback, Hardcover, eBook] } }
+        - { name: minPrice, in: query, schema: { type: number } }
+        - { name: maxPrice, in: query, schema: { type: number } }
+        - { name: sort, in: query, schema: { type: string, enum: [relevance, price_asc, price_desc, rating] } }
+      responses: { '200': { description: OK } }
+  /api/books/{id}:
+    get:
+      tags: [Catalogue]
+      security: []
+      summary: Book details with related reads and reviews
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /api/books/{id}/reviews:
+    post:
+      tags: [Catalogue]
+      summary: Leave a review (comment max 100 chars)
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewRequest' } } } }
+      responses: { '201': { description: Created } }
+  /api/recommendations:
+    get: { tags: [Catalogue], security: [], summary: Recommendations based on order history, responses: { '200': { description: OK } } }
+  /api/cart:
+    get: { tags: [Cart], summary: View cart with totals, responses: { '200': { description: OK } } }
+  /api/cart/items:
+    post:
+      tags: [Cart]
+      summary: Add a book to the cart
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CartAddRequest' } } } }
+      responses: { '200': { description: Updated cart } }
+  /api/cart/items/{itemId}:
+    put:
+      tags: [Cart]
+      summary: Set quantity (0 removes)
+      parameters: [{ name: itemId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { quantity: { type: integer, minimum: 0, maximum: 20 } } } } } }
+      responses: { '200': { description: Updated cart } }
+    delete:
+      tags: [Cart]
+      summary: Remove an item
+      parameters: [{ name: itemId, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Updated cart } }
+  /api/wishlist:
+    get: { tags: [Cart], summary: List wishlist, responses: { '200': { description: OK } } }
+  /api/wishlist/{bookId}:
+    post:
+      tags: [Cart]
+      summary: Add to wishlist
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: OK } }
+    delete:
+      tags: [Cart]
+      summary: Remove from wishlist
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: OK } }
+  /api/addresses:
+    get: { tags: [Orders], summary: Saved addresses, responses: { '200': { description: OK } } }
+    post:
+      tags: [Orders]
+      summary: Save an address
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AddressRequest' } } } }
+      responses: { '201': { description: Created } }
+  /api/addresses/{id}:
+    delete:
+      tags: [Orders]
+      summary: Delete an address
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Deleted } }
+  /api/checkout/preview:
+    get:
+      tags: [Orders]
+      summary: Price breakdown with optional coupon and gift points (1 point = Rs 1)
+      parameters:
+        - { name: coupon, in: query, schema: { type: string } }
+        - { name: points, in: query, schema: { type: integer } }
+      responses: { '200': { description: OK } }
+  /api/orders:
+    get: { tags: [Orders], summary: Order history, responses: { '200': { description: OK } } }
+    post:
+      tags: [Orders]
+      summary: Checkout - pays (simulated gateway), creates order, empties cart
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CheckoutRequest' } } } }
+      responses: { '201': { description: Order placed }, '400': { description: Empty cart / bad coupon / points } }
+  /api/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Order detail
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /api/orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel within 48 hours; payment is refunded
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Cancelled }, '400': { description: Window elapsed } }
+  /api/orders/{id}/buy-again:
+    post:
+      tags: [Orders]
+      summary: Re-add a past order's books to the cart
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Updated cart } }
+  /api/admin/books:
+    post:
+      tags: [Admin]
+      summary: Create a book (ADMIN)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookRequest' } } } }
+      responses: { '201': { description: Created }, '403': { description: Not admin } }
+  /api/admin/books/{id}:
+    put:
+      tags: [Admin]
+      summary: Update a book (ADMIN)
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookRequest' } } } }
+      responses: { '200': { description: OK } }
+    delete:
+      tags: [Admin]
+      summary: Delete a book (ADMIN)
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Deleted }, '409': { description: Referenced by orders } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties: { name: { type: string }, email: { type: string, format: email }, password: { type: string, minLength: 6 } }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string }, password: { type: string } }
+    AuthResponse:
+      type: object
+      properties: { token: { type: string }, user: { type: object } }
+    ReviewRequest:
+      type: object
+      required: [rating]
+      properties: { rating: { type: integer, minimum: 1, maximum: 5 }, comment: { type: string, maxLength: 100 } }
+    CartAddRequest:
+      type: object
+      required: [bookId]
+      properties: { bookId: { type: integer }, quantity: { type: integer, minimum: 1, maximum: 20 } }
+    AddressRequest:
+      type: object
+      required: [firstName, lastName, line1, city, pin, state, phone]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        line1: { type: string }
+        email: { type: string, format: email }
+        city: { type: string }
+        pin: { type: string }
+        state: { type: string }
+        country: { type: string, default: India }
+        phone: { type: string }
+    CheckoutRequest:
+      type: object
+      required: [paymentMethod]
+      description: Provide either addressId (saved address) or address (new one).
+      properties:
+        addressId: { type: integer }
+        address: { $ref: '#/components/schemas/AddressRequest' }
+        couponCode: { type: string, example: WELCOME100 }
+        pointsToRedeem: { type: integer, minimum: 0 }
+        paymentMethod: { type: string, enum: [CREDIT_CARD, DEBIT_CARD, UPI, WALLET] }
+    BookRequest:
+      type: object
+      required: [title, author, price, category]
+      properties:
+        title: { type: string }
+        author: { type: string }
+        description: { type: string }
+        publisher: { type: string }
+        format: { type: string }
+        language: { type: string }
+        price: { type: number }
+        coverUrl: { type: string }
+        category: { type: string }
+        section: { type: string, enum: [BESTSELLER, NEW, REGULAR] }
